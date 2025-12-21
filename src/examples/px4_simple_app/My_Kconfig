@@ -1,0 +1,5 @@
+menuconfig EXAMPLES_PX4_MY_SIMPLE_APP
+	bool "px4_my_simple_app"
+	default n
+	---help---
+		Enable support for px4_my_simple_app
