@@ -37,3 +37,6 @@ px4_add_module(
 		px4_simple_app.c
 	DEPENDS
 	)
+
+
+

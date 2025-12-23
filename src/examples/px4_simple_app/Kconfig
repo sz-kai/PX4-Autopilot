@@ -3,3 +3,5 @@ menuconfig EXAMPLES_PX4_SIMPLE_APP
 	default n
 	---help---
 		Enable support for px4_simple_app
+
+
