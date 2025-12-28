@@ -38,19 +38,53 @@
  * @author Example User <mail@example.com>
  */
 
-// #include <px4_platform_common/px4_config.h>
-#include <px4_platform_common/log.h>
-// #include <px4_platform_common/tasks.h>
-// #include <px4_platform_common/posix.h>
-// #include <unistd.h>
-// #include <stdio.h>
-// #include <poll.h>
-// #include <string.h>
-// #include <math.h>
 
-// #include <uORB/uORB.h>
-// #include <uORB/topics/vehicle_acceleration.h>
-// #include <uORB/topics/vehicle_attitude.h>
+#if 0
+__EXPORT int px4_my_simple_app_main(int argc, char *argv[]);
+
+int px4_my_simple_app_main(int argc, char *argv[])
+{
+	PX4_INFO("Hello Sky! test");
+	return OK;
+}
+#endif
+
+#if 0
+int px4_my_simple_app_main(int argc, char *argv[])
+{
+	if (argc < 2) {
+		PX4_INFO("Usage: px4_simple_app {start|stop|status}");
+		return 1;
+	}
+
+	if (!strcmp(argv[1], "start")) {
+		// 执行启动逻辑
+		PX4_INFO("App started");
+
+	} else if (!strcmp(argv[1], "stop")) {
+		// 执行停止逻辑
+		PX4_INFO("App stopped");
+	}
+
+	return OK;
+}
+#endif
+
+
+#if 1
+#include <px4_platform_common/px4_config.h>
+#include <px4_platform_common/log.h>
+#include <px4_platform_common/tasks.h>
+#include <px4_platform_common/posix.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <poll.h>
+#include <string.h>
+#include <math.h>
+
+#include <uORB/uORB.h>
+#include <uORB/topics/sensor_combined.h>
+#include <uORB/topics/vehicle_attitude.h>
 
 
 __EXPORT int px4_my_simple_app_main(int argc, char *argv[]);
@@ -58,6 +92,80 @@ __EXPORT int px4_my_simple_app_main(int argc, char *argv[]);
 int px4_my_simple_app_main(int argc, char *argv[])
 {
 	PX4_INFO("Hello Sky!");
-	return OK;
-}
 
+	/* subscribe to sensor_combined topic */
+	/*sub:subscribe,fd:file descriptor,文件描述符*/
+	/*订阅数据*/
+	int sensor_sub_fd = orb_subscribe(ORB_ID(sensor_combined));
+	//int gps_sub_2 = orb_subscribe_multi(ORB_ID(vehicle_gps_position), 1);
+	/* limit the update rate to 5 Hz */
+	/*设置更新率为5Hz*/
+	orb_set_interval(sensor_sub_fd, 200);
+
+	/* advertise attitude topic */
+	struct vehicle_attitude_s att;
+	memset(&att, 0, sizeof(att));
+	/*广播vehicle_attitude数据，在发布数据前需要先广播*/
+	orb_advert_t att_pub = orb_advertise(ORB_ID(vehicle_attitude), &att);
+
+	/* one could wait for multiple topics with this technique, just using one here */
+	px4_pollfd_struct_t fds[] = {
+		{ .fd = sensor_sub_fd,   .events = POLLIN },
+		/* there could be more file descriptors here, in the form like:
+		 * { .fd = other_sub_fd,   .events = POLLIN },
+		 */
+	};
+
+	int error_counter = 0;
+
+	for (int i = 0; i < 5; i++) {
+		/* wait for sensor update of 1 file descriptor for 1000 ms (1 second) */
+		int poll_ret = px4_poll(fds, 1, 1000);
+
+		/* handle the poll result */
+		if (poll_ret == 0) {
+			/* this means none of our providers is giving us data */
+			PX4_ERR("Got no data within a second");
+
+		} else if (poll_ret < 0) {
+			/* this is seriously bad - should be an emergency */
+			if (error_counter < 10 || error_counter % 50 == 0) {
+				/* use a counter to prevent flooding (and slowing us down) */
+				PX4_ERR("ERROR return value from poll(): %d", poll_ret);
+			}
+
+			error_counter++;
+
+		} else {
+
+			if (fds[0].revents & POLLIN) {
+				/* obtained data for the first file descriptor */
+				struct sensor_combined_s raw;
+				/* copy sensors raw data into local buffer */
+				orb_copy(ORB_ID(sensor_combined), sensor_sub_fd, &raw);
+				PX4_INFO("Accelerometer:\t%8.4f\t%8.4f\t%8.4f",
+					 (double)raw.accelerometer_m_s2[0],
+					 (double)raw.accelerometer_m_s2[1],
+					 (double)raw.accelerometer_m_s2[2]);
+
+				/* set att and publish this information for other apps
+				 the following does not have any meaning, it's just an example
+				*/
+				att.q[0] = raw.accelerometer_m_s2[0];
+				att.q[1] = raw.accelerometer_m_s2[1];
+				att.q[2] = raw.accelerometer_m_s2[2];
+
+				orb_publish(ORB_ID(vehicle_attitude), att_pub, &att);
+			}
+
+			/* there could be more file descriptors here, in the form like:
+			 * if (fds[1..n].revents & POLLIN) {}
+			 */
+		}
+	}
+
+	PX4_INFO("exiting");
+
+	return 0;
+}
+#endif
