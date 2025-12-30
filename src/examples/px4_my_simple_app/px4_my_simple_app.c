@@ -131,6 +131,9 @@ void px4_my_simple_app_main(int argc, char *argv[])
 		return;
 	}
 
+	/* 设置数据更新频率 */
+	orb_set_interval(sensor_combined_sub_fd, 500); // 500ms
+
 	px4_pollfd_struct_t fds[] = {
 		{.fd = sensor_combined_sub_fd, .events = POLLIN},
 		/* 可以同时监视多个主题 */
@@ -153,7 +156,7 @@ void px4_my_simple_app_main(int argc, char *argv[])
 			return;
 
 
-			
+
 		} else if (poll_ret < 0) {
 			PX4_ERR("px4_poll failed");
 			return;
