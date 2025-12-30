@@ -86,7 +86,6 @@ int px4_simple_app_main(int argc, char *argv[])
 		if (poll_ret == 0) {
 			/* this means none of our providers is giving us data */
 			PX4_ERR("Got no data within a second");
-
 		} else if (poll_ret < 0) {
 			/* this is seriously bad - should be an emergency */
 			if (error_counter < 10 || error_counter % 50 == 0) {
