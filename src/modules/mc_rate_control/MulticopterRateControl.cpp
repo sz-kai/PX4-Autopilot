@@ -43,6 +43,11 @@ using namespace matrix;
 using namespace time_literals;
 using math::radians;
 
+/**
+ * @brief 构造函数
+ *
+ * @param vtol：是否为VTOL飞行器
+ */
 MulticopterRateControl::MulticopterRateControl(bool vtol) :
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::rate_ctrl),
@@ -53,6 +58,8 @@ MulticopterRateControl::MulticopterRateControl(bool vtol) :
 	_vehicle_status.vehicle_type = vehicle_status_s::VEHICLE_TYPE_ROTARY_WING;
 
 	parameters_updated();
+	/* publish()会自动调用advertise()，这里提前注册的原因可能是在模块启动前，其他任务需要检查该主题的存在性 */
+	/* 或者多实例情况下，占用实例编号等 */
 	_controller_status_pub.advertise();
 }
 
@@ -78,24 +85,33 @@ MulticopterRateControl::parameters_updated()
 	// rate control parameters
 	// The controller gain K is used to convert the parallel (P + I/s + sD) form
 	// to the ideal (K * [1 + 1/sTi + sTd]) form
+	/*Vector3f：合并为一个三维向量*/
 	const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
 
+	/*设置PID增益*/
+	/*emult：逐元素乘*/
 	_rate_control.setPidGains(
 		rate_k.emult(Vector3f(_param_mc_rollrate_p.get(), _param_mc_pitchrate_p.get(), _param_mc_yawrate_p.get())),
 		rate_k.emult(Vector3f(_param_mc_rollrate_i.get(), _param_mc_pitchrate_i.get(), _param_mc_yawrate_i.get())),
 		rate_k.emult(Vector3f(_param_mc_rollrate_d.get(), _param_mc_pitchrate_d.get(), _param_mc_yawrate_d.get())));
 
+	/*设置积分饱和*/
+	/*rr：roll rate, pr：pitch rate, yr：yaw rate*/
 	_rate_control.setIntegratorLimit(
 		Vector3f(_param_mc_rr_int_lim.get(), _param_mc_pr_int_lim.get(), _param_mc_yr_int_lim.get()));
 
+	/*设置前馈增益*/
 	_rate_control.setFeedForwardGain(
 		Vector3f(_param_mc_rollrate_ff.get(), _param_mc_pitchrate_ff.get(), _param_mc_yawrate_ff.get()));
 
 
 	// manual rate control acro mode rate limits
+	/*设置特技模式最大角速率*/
+	/*radians：角度转弧度*/
 	_acro_rate_max = Vector3f(radians(_param_mc_acro_r_max.get()), radians(_param_mc_acro_p_max.get()),
 				  radians(_param_mc_acro_y_max.get()));
 
+        /*设置yaw低通滤波*/
 	_output_lpf_yaw.setCutoffFreq(_param_mc_yaw_tq_cutoff.get());
 }
 
@@ -116,7 +132,9 @@ MulticopterRateControl::Run()
 		parameter_update_s param_update;
 		_parameter_update_sub.copy(&param_update);
 
+		/*同步数据*/
 		updateParams();
+		/*应用配置*/
 		parameters_updated();
 	}
 

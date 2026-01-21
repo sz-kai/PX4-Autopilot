@@ -302,9 +302,10 @@ namespace time_literals
 
 // User-defined integer literals for different time units.
 // The base unit is hrt_abstime in microseconds
-
+/* constexpr表示常量表达式，当传入函数为一个常量时，可以使函数在编译期时执行，得出常量结果，减少运行时的开销 */
 constexpr hrt_abstime operator ""_s(unsigned long long seconds)
 {
+	/*这里的hrt_abstime()并不是一个函数，而是强制类型转换*/
 	return hrt_abstime(seconds * 1000000ULL);
 }
 

@@ -50,6 +50,7 @@
 #include <uORB/topics/sensor_accel.h>
 #include <uORB/topics/vehicle_status.h>
 
+/* px4中定义了一套时间字面量(time_literals) */
 using namespace time_literals;
 
 class WorkItemExample : public ModuleBase<WorkItemExample>, public ModuleParams, public px4::ScheduledWorkItem
