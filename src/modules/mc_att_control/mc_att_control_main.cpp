@@ -54,7 +54,7 @@
 using namespace matrix;
 
 MulticopterAttitudeControl::MulticopterAttitudeControl(bool vtol) :
-	ModuleParams(nullptr),
+	ModuleParams(nullptr),/*初始化参数基类，传入nullptr表示该模块是参数基类的顶层列表*/
 	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
 	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
 	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")),

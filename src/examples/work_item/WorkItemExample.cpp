@@ -34,8 +34,8 @@
 #include "WorkItemExample.hpp"
 
 WorkItemExample::WorkItemExample() :
-	ModuleParams(nullptr),
-	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::test1)
+	ModuleParams(nullptr),/* 初始化参数基类 */
+	ScheduledWorkItem(MODULE_NAME, px4::wq_configurations::test1)/* 指定模块运行的工作队列 */
 {
 }
 
@@ -63,6 +63,11 @@ void WorkItemExample::Run()
 {
 	if (should_exit()) {
 		ScheduleClear();
+		/*因为`exit_and_cleanup`会销毁模块实例，
+		若模块类中包含`SubscriptionCallbackWorkItem`实例且在初始化时注册了回调，
+		销毁时会调用`SubscriptionCallbackWorkItem`的析构函数，
+		进而调用`unregisterCallback()`取消注册，
+		故上面的程序没有调用取消注册回调函数*/
 		exit_and_cleanup();
 		return;
 	}

@@ -87,6 +87,8 @@ public:
 	}
 
 protected:
+	/*这里的{}为值初始化，如果Type是基本数据类型，会被初始化为0，指针则会被初始化为nullptr，类则会调用默认构造函数*/
+	/*这在模板中是标准的初始化方式*/
 	Type _slew_rate{}; ///< maximum rate of change for the value
 	Type _value{}; ///< state to keep last value of the slew rate
 };
