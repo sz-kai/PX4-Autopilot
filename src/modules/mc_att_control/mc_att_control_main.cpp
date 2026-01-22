@@ -55,17 +55,20 @@ using namespace matrix;
 
 MulticopterAttitudeControl::MulticopterAttitudeControl(bool vtol) :
 	ModuleParams(nullptr),/*初始化参数基类，传入nullptr表示该模块是参数基类的顶层列表*/
-	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
+	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),/*指定工作队列*/
 	_vehicle_attitude_setpoint_pub(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
 	_loop_perf(perf_alloc(PC_ELAPSED, MODULE_NAME": cycle")),
 	_vtol(vtol)
 {
 	parameters_updated();
 	// Rate of change 5% per second -> 1.6 seconds to ramp to default 8% MPC_MANTHR_MIN
+	/*设定油门变化率最小值，这里设定5%，则最大需要1.6s达到MPC_MANTHR_MIN(8%),即手动油门最小值*/
+	/*MCP - Multi-rotor Position Controller, MANTHR = MANual THRottle（手动油门） */
 	_manual_throttle_minimum.setSlewRate(0.05f);
 	// Rate of change 50% per second -> 2 seconds to ramp to 100%
 	_manual_throttle_maximum.setSlewRate(0.5f);
 	// Rate of change 5% per second -> 6 seconds to ramp 30% if hover thrust parameter is off
+	/*悬停推力变化率*/
 	_hover_thrust_slew_rate.setSlewRate(0.05f);
 }
 
@@ -98,6 +101,7 @@ MulticopterAttitudeControl::parameters_updated()
 						radians(_param_mc_yawrate_max.get())));
 
 	// Update from hover thrust parameter if there's no valid estimate in use
+	/*如果悬停推力估计值无效，则使用参数中的默认悬停推力值*/
 	if (!PX4_ISFINITE(_hover_thrust_estimate)) {
 		_hover_thrust_slew_rate.setForcedValue(_param_mpc_thr_hover.get());
 	}
