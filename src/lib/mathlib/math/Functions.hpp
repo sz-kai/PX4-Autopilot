@@ -148,6 +148,20 @@ const T expo_deadzone(const T &value, const T &e, const T &dz)
  * y_low -------
  *         x_low   x_high
  */
+
+/**
+ * @brief 线性插值函数
+ *
+ * @tparam T 数据类型（通常为 `float` 或 `double`）。
+ * 	只要该类型支持比较运算符（`<=`, `>`）和基本算术运算符（`+`, `-`, `*`, `/`），
+ * 	即可使用此模板
+ * @param value	需要进行插值的当前输入值
+ * @param x_low	输入范围的下界
+ * @param x_high 输入范围的上界
+ * @param y_low	输出上界
+ * @param y_high 输出下界
+ * @return const T 映射后的输出值
+ */
 template<typename T>
 const T interpolate(const T &value, const T &x_low, const T &x_high, const T &y_low, const T &y_high)
 {
@@ -196,6 +210,17 @@ const T interpolateN(const T &value, const T(&y)[N])
  * y[0] -------
  *          x[0] x[1] ... x[N-1]
  * Note: x[N] corner coordinates have to be sorted in ascending order
+ */
+/**
+ * @brief interpolateNXY 函数用于根据给定的离散数据点集合（X数组和Y数组），
+ *        计算输入value对应的输出值。它通过在两个相邻的数据点之间进行线性插值来拟合曲线。
+ *
+ * @tparam T
+ * @tparam N
+ * @param value 需要进行查询/插值的输入值
+ * @param x 自变量数组。定义了插值的节点位置。重要约束：必须按升序排列。
+ * @param y 因变量数组。定义了对应x节点的输出值。
+ * @return 基于分段线性模型计算出的输出值。
  */
 template<typename T, size_t N>
 const T interpolateNXY(const T &value, const T(&x)[N], const T(&y)[N])
