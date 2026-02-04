@@ -109,6 +109,13 @@ MulticopterAttitudeControl::parameters_updated()
 	_man_tilt_max = math::radians(_param_mpc_man_tilt_max.get());
 }
 
+
+/**
+ * @brief 杆量映射函数，根据油门杆输入计算出对应的推力值。根据参数MPC_THR_CURVE选择三种映射模式
+ *
+ * @param throttle_stick_input
+ * @return float
+ */
 float
 MulticopterAttitudeControl::throttle_curve(float throttle_stick_input)
 {
@@ -117,23 +124,26 @@ MulticopterAttitudeControl::throttle_curve(float throttle_stick_input)
 	// throttle_stick_input is in range [-1, 1]
 	switch (_param_mpc_thr_curve.get()) {
 	case 1: // no rescaling
+		/*线性无重缩放，杆量(-1~1)线性映射到_manual_throttle_minimum~_param_mpc_thr_max*/
 		thrust = math::interpolate(throttle_stick_input, -1.f, 1.f,
 					   _manual_throttle_minimum.getState(), _param_mpc_thr_max.get());
 		break;
 
 	case 2: // rescale to hover thrust param at 0 stick input
+		/*分段线性映射，将**摇杆中位**映射到用户设置的**悬停推力参数***/
 		thrust = math::interpolateNXY(throttle_stick_input,
 		{-1.f, 0.f, 1.f},
 		{_manual_throttle_minimum.getState(), _param_mpc_thr_hover.get(), _param_mpc_thr_max.get()});
 		break;
 
 	default: // 0 or other: rescale to HTE value
+		/*默认(最常用)，中位摇杆映射为_hover_thrust_slew_rate，_hover_thrust_slew_rate由悬停推力估计器输出*/
 		thrust = math::interpolateNXY(throttle_stick_input,
 		{-1.f, 0.f, 1.f},
 		{_manual_throttle_minimum.getState(), _hover_thrust_slew_rate.getState(), _param_mpc_thr_max.get()});
 		break;
 	}
-
+	/*限幅，_manual_throttle_maximum可以保证开始时thrust不会突变(受限于_manual_throttle_maximum变化率)*/
 	return math::min(thrust, _manual_throttle_maximum.getState());
 }
 
@@ -260,16 +270,21 @@ MulticopterAttitudeControl::Run()
 			vehicle_status_s vehicle_status;
 
 			if (_vehicle_status_sub.copy(&vehicle_status)) {
+				/*车辆类型与状态获取，决定了后面的控制模块是否使用逻辑*/
 				_vehicle_type_rotary_wing = (vehicle_status.vehicle_type == vehicle_status_s::VEHICLE_TYPE_ROTARY_WING);
 				_vtol = vehicle_status.is_vtol;
 				_vtol_in_transition_mode = vehicle_status.in_transition_mode;
 				_vtol_tailsitter = vehicle_status.is_vtol_tailsitter;
 
+				/*是否解锁*/
 				const bool armed = (vehicle_status.arming_state == vehicle_status_s::ARMING_STATE_ARMED);
+				/*_spooled_u怠速起转完成标志，当飞机解锁后，时间大于_param_com_spoolup_time参数设定的时间，置一*/
+				/*这个标志会在后续失能积分器和限制最大油门，防止侧翻*/
 				_spooled_up = armed && hrt_elapsed_time(&vehicle_status.armed_time) > _param_com_spoolup_time.get() * 1_s;
 			}
 		}
 
+		/*落地检测*/
 		if (_vehicle_land_detected_sub.updated()) {
 			vehicle_land_detected_s vehicle_land_detected;
 
@@ -278,15 +293,21 @@ MulticopterAttitudeControl::Run()
 			}
 		}
 
+
 		if (_vehicle_local_position_sub.updated()) {
 			vehicle_local_position_s vehicle_local_position;
 
 			if (_vehicle_local_position_sub.copy(&vehicle_local_position)) {
+				/*_unaided_heading,未辅助的航向角，用于在GPS失效时保持航向稳定*/
 				_unaided_heading = vehicle_local_position.unaided_heading;
 			}
 		}
 
 		// during transitions VTOL module generates attitude setpoints
+		/*下面三行代码决定了飞机是否使用本模块进行姿态控制*/
+		/*对于普通多旋翼，只需flag_control_attitude_enabled=true*/
+		/*对于vtol，如果在旋翼模式(is_hovering)，由本模块控制*/
+		/*特例 (Tailsitter)，尾座式vtol（像火箭一样立着飞）在转换期间依然使用多旋翼的姿态控制算法。*/
 		const bool is_hovering = (_vehicle_type_rotary_wing && !_vtol_in_transition_mode);
 		const bool is_tailsitter_transition = (_vtol_tailsitter && _vtol_in_transition_mode);
 
@@ -295,6 +316,9 @@ MulticopterAttitudeControl::Run()
 
 		if (run_att_ctrl) {
 			// Generate the attitude setpoint from stick inputs if we are in Manual/Stabilized mode
+			/*纯手动模式*/
+			/*开启手动控制，且没有高度、速度、位置控制的辅助*/
+			/*Stabilized (自稳), Manual (手动), Acro (特技)。*/
 			if (_vehicle_control_mode.flag_control_manual_enabled &&
 			    !_vehicle_control_mode.flag_control_altitude_enabled &&
 			    !_vehicle_control_mode.flag_control_velocity_enabled &&
@@ -303,6 +327,9 @@ MulticopterAttitudeControl::Run()
 				generate_attitude_setpoint(q, dt);
 
 			} else {
+				/*自动模式*/
+				/*Altitude (定高), Position (定点), Mission (航点), Offboard*/
+				/*重置手动输入的滤波器（防止切换回手动时残留旧数据），然后等待接收外部传入的设定点*/
 				_man_roll_input_filter.reset(0.f);
 				_man_pitch_input_filter.reset(0.f);
 				_yaw_setpoint_stabilized = NAN;
@@ -310,6 +337,7 @@ MulticopterAttitudeControl::Run()
 			}
 
 			// Check for new attitude setpoint
+			/*非纯手动模式，目标姿态通常由位置控制器（`mc_pos_control`）计算好并通过 uORB 发送过来*/
 			if (_vehicle_attitude_setpoint_sub.updated()) {
 				vehicle_attitude_setpoint_s vehicle_attitude_setpoint;
 
