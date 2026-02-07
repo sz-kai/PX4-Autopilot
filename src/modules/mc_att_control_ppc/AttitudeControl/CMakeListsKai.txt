@@ -31,13 +31,13 @@
 #
 ############################################################################
 
-px4_add_library(AttitudeControlKai
+px4_add_library(AttitudeControlKaiPPC
 	AttitudeControl.cpp
 	AttitudeControl.hpp
 	AttitudeControlMath.hpp
 )
-target_compile_options(AttitudeControlKai PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
-target_include_directories(AttitudeControlKai PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_compile_options(AttitudeControlPPC PRIVATE ${MAX_CUSTOM_OPT_LEVEL})
+target_include_directories(AttitudeControlPPC PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
 
-# px4_add_unit_gtest(SRC AttitudeControlTest.cpp LINKLIBS AttitudeControlKai)
-# px4_add_unit_gtest(SRC AttitudeControlMathTest.cpp LINKLIBS AttitudeControlKai)
+# px4_add_unit_gtest(SRC AttitudeControlTest.cpp LINKLIBS AttitudeControlPPC)
+# px4_add_unit_gtest(SRC AttitudeControlMathTest.cpp LINKLIBS AttitudeControlPPC)

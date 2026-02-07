@@ -1,0 +1,12 @@
+menuconfig MODULES_MC_ATT_CONTROL_PPC
+	bool "mc_att_control_ppc"
+	default n
+	---help---
+		Enable support for mc_att_control_ppc
+
+menuconfig USER_MC_ATT_CONTROL_PPC
+	bool "mc_att_control_ppc running as userspace module"
+	default n
+	depends on BOARD_PROTECTED && MODULES_MC_ATT_CONTROL_PPC
+	---help---
+		Put mc_att_control_ppc in userspace memory

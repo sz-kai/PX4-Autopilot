@@ -45,13 +45,13 @@
  * @brief 多旋翼飞行器控制（练习用）
  *
  */
-class MulticopterAttitudeControlPractice: public ModuleBase<MulticopterAttitudeControlPractice>,
+class MulticopterAttControlPPC: public ModuleBase<MulticopterAttControlPPC>,
 	public ModuleParams, public px4::WorkItem,
 
 {
 public:
-	MulticopterAttitudeControlPractice(bool vtol = false);
-	~MulticopterAttitudeControlPractice();
+	MulticopterAttControlPPC(bool vtol = false);
+	~MulticopterAttControlPPC();
 
 private:
 	/*姿态设定值发布（根据飞机类型在构造函数初始化）*/

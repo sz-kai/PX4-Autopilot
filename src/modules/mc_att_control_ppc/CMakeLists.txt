@@ -31,18 +31,18 @@
 #
 ############################################################################
 
-add_subdirectory(AttitudeControl)
+add_subdirectory(AttitudeControlPPC)
 
 px4_add_module(
-	MODULE modules__mc_att_control_kai
-	MAIN mc_att_control_kai
+	MODULE modules__mc_att_control_ppc
+	MAIN mc_att_control_ppc_main
 	COMPILE_FLAGS
 		${MAX_CUSTOM_OPT_LEVEL}
 	SRCS
-		mc_att_control_main.cpp
-		mc_att_control.hpp
+		mc_att_control_ppc_main.cpp
+		mc_att_control_ppc.hpp
 	DEPENDS
-		AttitudeControlKai
+		AttitudeControlPPC
 		mathlib
 		px4_work_queue
 		StickYaw

@@ -31,12 +31,12 @@
  *
  ****************************************************************************/
 
-#include "mc_att_control.hpp"
+#include "mc_att_control_ppc.hpp"
 
 /**
  * @brief 构造函数，参数、工作项基类初始化，
  */
-MulticopterAttitudeControlPractice::MulticopterAttitudeControlPractice(bool vtol):
+MulticopterAttControlPPC::MulticopterAttControlPPC(bool vtol):
 	ModuleParams(nullptr),
 	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
 	_vehicle_attitude_setpoint(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
@@ -47,7 +47,7 @@ MulticopterAttitudeControlPractice::MulticopterAttitudeControlPractice(bool vtol
 
 }
 
-MulticopterAttitudeControlPractice::~MulticopterAttitudeControlPractice()
+MulticopterAttControlPPC::~MulticopterAttControlPPC()
 {
 
 }
@@ -55,8 +55,8 @@ MulticopterAttitudeControlPractice::~MulticopterAttitudeControlPractice()
 /**
  * Multicopter attitude control app start / stop handling function
  */
-extern "C" __EXPORT int mc_att_control_kai_main(int argc, char *argv[])
+extern "C" __EXPORT int mc_att_control_ppc_main(int argc, char *argv[])
 {
-	return MulticopterAttitudeControlPractice::main(argc, argv);
+	return MulticopterAttControlPPC::main(argc, argv);
 }
 
