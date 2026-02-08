@@ -46,19 +46,30 @@
  *
  */
 class MulticopterAttControlPPC: public ModuleBase<MulticopterAttControlPPC>,
-	public ModuleParams, public px4::WorkItem,
-
+	public ModuleParams, public px4::WorkItem
 {
 public:
 	MulticopterAttControlPPC(bool vtol = false);
-	~MulticopterAttControlPPC();
+	~MulticopterAttControlPPC() override;
+
+	/** @see ModuleBase */
+	static int task_spawn(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int custom_command(int argc, char *argv[]);
+
+	/** @see ModuleBase */
+	static int print_usage(const char *reason = nullptr);
+
+	bool init();
 
 private:
+	void Run() override;
 	/*姿态设定值发布（根据飞机类型在构造函数初始化）*/
-	uORB::Publication<vehicle_attitude_setpoint_s> _vehicle_attitude_setpoint;
+	// uORB::Publication<vehicle_attitude_setpoint_s> _vehicle_attitude_setpoint;
 
 	/*性能计数器*/
-	perf_counter_t _loop_pref;
+	// perf_counter_t _loop_pref;
 
 	/**/
 	bool _vtol{false};

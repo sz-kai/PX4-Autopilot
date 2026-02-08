@@ -38,19 +38,106 @@
  */
 MulticopterAttControlPPC::MulticopterAttControlPPC(bool vtol):
 	ModuleParams(nullptr),
-	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers),
-	_vehicle_attitude_setpoint(vtol ? ORB_ID(mc_virtual_attitude_setpoint) : ORB_ID(vehicle_attitude_setpoint)),
-	_loop_pref(perf_alloc(PC_ELAPSED,MODULE_NAME": cycle")),
-	_vtol(false)
+	WorkItem(MODULE_NAME, px4::wq_configurations::nav_and_controllers)
 {
 	/*初始化*/
 
 }
 
+
+
 MulticopterAttControlPPC::~MulticopterAttControlPPC()
 {
 
 }
+
+
+bool
+MulticopterAttControlPPC::init()
+{
+	// if (!_vehicle_attitude_sub.registerCallback()) {
+	// 	PX4_ERR("callback registration failed");
+	// 	return false;
+	// }
+
+	return true;
+}
+
+
+void MulticopterAttControlPPC::Run()
+{
+
+}
+
+
+
+
+int MulticopterAttControlPPC::task_spawn(int argc, char *argv[])
+{
+	bool vtol = false;
+
+	if (argc > 1) {
+		if (strcmp(argv[1], "vtol") == 0) {
+			vtol = true;
+		}
+	}
+
+	MulticopterAttControlPPC *instance = new MulticopterAttControlPPC(vtol);
+
+	if (instance) {
+		_task_id = task_id_is_work_queue;
+
+		if (instance->init()) {
+			return PX4_OK;
+		}
+
+	} else {
+		PX4_ERR("alloc failed");
+	}
+
+	delete instance;
+	_object.store(nullptr);
+	_task_id = -1;
+
+	return PX4_ERROR;
+}
+
+int MulticopterAttControlPPC::custom_command(int argc, char *argv[])
+{
+	return print_usage("unknown command");
+}
+
+int MulticopterAttControlPPC::print_usage(const char *reason)
+{
+	if (reason) {
+		PX4_WARN("%s\n", reason);
+	}
+
+	PRINT_MODULE_DESCRIPTION(
+		R"DESCR_STR(
+### Description
+This implements the multicopter attitude controller. It takes attitude
+setpoints (`vehicle_attitude_setpoint`) as inputs and outputs a rate setpoint.
+
+The controller has a P loop for angular error
+
+Publication documenting the implemented Quaternion Attitude Control:
+Nonlinear Quadrocopter Attitude Control (2013)
+by Dario Brescianini, Markus Hehn and Raffaello D'Andrea
+Institute for Dynamic Systems and Control (IDSC), ETH Zurich
+
+https://www.research-collection.ethz.ch/bitstream/handle/20.500.11850/154099/eth-7387-01.pdf
+
+)DESCR_STR");
+
+	PRINT_MODULE_USAGE_NAME("mc_att_control_ppc", "controller");
+	PRINT_MODULE_USAGE_COMMAND("start");
+	PRINT_MODULE_USAGE_ARG("vtol", "VTOL mode", true);
+	PRINT_MODULE_USAGE_DEFAULT_COMMANDS();
+
+	return 0;
+}
+
 
 /**
  * Multicopter attitude control app start / stop handling function
@@ -59,4 +146,3 @@ extern "C" __EXPORT int mc_att_control_ppc_main(int argc, char *argv[])
 {
 	return MulticopterAttControlPPC::main(argc, argv);
 }
-

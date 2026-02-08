@@ -31,7 +31,7 @@
 #
 ############################################################################
 
-px4_add_library(AttitudeControlKaiPPC
+px4_add_library(AttitudeControlPPC
 	AttitudeControl.cpp
 	AttitudeControl.hpp
 	AttitudeControlMath.hpp
