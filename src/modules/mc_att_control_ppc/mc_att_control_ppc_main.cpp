@@ -128,7 +128,7 @@ MulticopterAttitudeControlPPC::parameters_updated()
 	// The controller gain K is used to convert the parallel (P + I/s + sD) form
 	// to the ideal (K * [1 + 1/sTi + sTd]) form
 	/*Vector3f：合并为一个三维向量*/
-	const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
+	// const Vector3f rate_k = Vector3f(_param_mc_rollrate_k.get(), _param_mc_pitchrate_k.get(), _param_mc_yawrate_k.get());
 
 	/*角速度*/
 	/*设置PID增益*/
@@ -265,6 +265,32 @@ MulticopterAttitudeControlPPC::generate_attitude_setpoint(const Quatf &q, float 
 	_vehicle_attitude_setpoint_pub.publish(attitude_setpoint);
 }
 
+
+void MulticopterAttitudeControlPPC::updateActuatorControlsStatus(const vehicle_torque_setpoint_s &vehicle_torque_setpoint,
+		float dt)
+{
+	for (int i = 0; i < 3; i++) {
+		_control_energy[i] += vehicle_torque_setpoint.xyz[i] * vehicle_torque_setpoint.xyz[i] * dt;
+	}
+
+	_energy_integration_time += dt;
+
+	if (_energy_integration_time > 500e-3f) {
+
+		actuator_controls_status_s status;
+		status.timestamp = vehicle_torque_setpoint.timestamp;
+
+		for (int i = 0; i < 3; i++) {
+			status.control_power[i] = _control_energy[i] / _energy_integration_time;
+			_control_energy[i] = 0.f;
+		}
+
+		_actuator_controls_status_pub.publish(status);
+		_energy_integration_time = 0.f;
+	}
+}
+
+
 void
 MulticopterAttitudeControlPPC::Run()
 {
@@ -362,6 +388,44 @@ MulticopterAttitudeControlPPC::Run()
 			}
 		}
 
+		// // use rates setpoint topic
+		// vehicle_rates_setpoint_s vehicle_rates_setpoint{};
+
+		// if (_vehicle_control_mode.flag_control_manual_enabled && !_vehicle_control_mode.flag_control_attitude_enabled) {
+		// 	// generate the rate setpoint from sticks
+		// 	manual_control_setpoint_s manual_control_setpoint;
+
+		// 	if (_manual_control_setpoint_sub.update(&manual_control_setpoint)) {
+		// 		// manual rates control - ACRO mode
+		// 		const Vector3f man_rate_sp{
+		// 			math::superexpo(manual_control_setpoint.roll, _param_mc_acro_expo.get(), _param_mc_acro_supexpo.get()),
+		// 			math::superexpo(-manual_control_setpoint.pitch, _param_mc_acro_expo.get(), _param_mc_acro_supexpo.get()),
+		// 			math::superexpo(manual_control_setpoint.yaw, _param_mc_acro_expo_y.get(), _param_mc_acro_supexpoy.get())};
+
+		// 		_rates_setpoint = man_rate_sp.emult(_acro_rate_max);
+		// 		_thrust_setpoint(2) = -(manual_control_setpoint.throttle + 1.f) * .5f;
+		// 		_thrust_setpoint(0) = _thrust_setpoint(1) = 0.f;
+
+		// 		// publish rate setpoint
+		// 		vehicle_rates_setpoint.roll = _rates_setpoint(0);
+		// 		vehicle_rates_setpoint.pitch = _rates_setpoint(1);
+		// 		vehicle_rates_setpoint.yaw = _rates_setpoint(2);
+		// 		_thrust_setpoint.copyTo(vehicle_rates_setpoint.thrust_body);
+		// 		vehicle_rates_setpoint.timestamp = hrt_absolute_time();
+
+		// 		_vehicle_rates_setpoint_pub.publish(vehicle_rates_setpoint);
+		// 	}
+
+		// } else if (_vehicle_rates_setpoint_sub.update(&vehicle_rates_setpoint)) {
+		// 	if (_vehicle_rates_setpoint_sub.copy(&vehicle_rates_setpoint)) {
+		// 		_rates_setpoint(0) = PX4_ISFINITE(vehicle_rates_setpoint.roll)  ? vehicle_rates_setpoint.roll  : rates(0);
+		// 		_rates_setpoint(1) = PX4_ISFINITE(vehicle_rates_setpoint.pitch) ? vehicle_rates_setpoint.pitch : rates(1);
+		// 		_rates_setpoint(2) = PX4_ISFINITE(vehicle_rates_setpoint.yaw)   ? vehicle_rates_setpoint.yaw   : rates(2);
+		// 		_thrust_setpoint = Vector3f(vehicle_rates_setpoint.thrust_body);
+		// 	}
+		// }
+
+
 		// during transitions VTOL module generates attitude setpoints
 		/*下面三行代码决定了飞机是否使用本模块进行姿态控制*/
 		/*对于普通多旋翼，只需flag_control_attitude_enabled=true*/
@@ -372,6 +436,10 @@ MulticopterAttitudeControlPPC::Run()
 
 		const bool run_att_ctrl = _vehicle_control_mode.flag_control_attitude_enabled
 					  && (is_hovering || is_tailsitter_transition);
+		Quatf qe{};
+		Vector3f epsilon_q{};
+		Matrix3f Q_e{};
+		Matrix3f R_q{};
 
 		if (run_att_ctrl) {
 			// Generate the attitude setpoint from stick inputs if we are in Manual/Stabilized mode
@@ -429,9 +497,9 @@ MulticopterAttitudeControlPPC::Run()
 				_quat_reset_counter = v_att.quat_reset_counter;
 			}
 
-			Vector3f rates_sp = _attitude_control.update(q);
+			Vector3f rates_sp = _attitude_control.update(q, qe, epsilon_q, Q_e, R_q);
 
-			const hrt_abstime now = hrt_absolute_time();
+			const hrt_abstime now1 = hrt_absolute_time();
 			autotune_attitude_control_status_s pid_autotune;
 
 			if (_autotune_attitude_control_status_sub.copy(&pid_autotune)) {
@@ -439,7 +507,7 @@ MulticopterAttitudeControlPPC::Run()
 				     || pid_autotune.state == autotune_attitude_control_status_s::STATE_PITCH
 				     || pid_autotune.state == autotune_attitude_control_status_s::STATE_YAW
 				     || pid_autotune.state == autotune_attitude_control_status_s::STATE_TEST)
-				    && ((now - pid_autotune.timestamp) < 1_s)) {
+				    && ((now1 - pid_autotune.timestamp) < 1_s)) {
 					rates_sp += Vector3f(pid_autotune.rate_sp);
 				}
 			}
@@ -478,9 +546,174 @@ MulticopterAttitudeControlPPC::Run()
 		if (PX4_ISFINITE(_hover_thrust_estimate)) {
 			_hover_thrust_slew_rate.update(_hover_thrust_estimate, dt);
 		}
-	}
 
-	perf_end(_loop_perf);
+
+		/*角速度控制*/
+		// use rates setpoint topic
+		vehicle_rates_setpoint_s vehicle_rates_setpoint{};
+
+		if (_vehicle_control_mode.flag_control_manual_enabled && !_vehicle_control_mode.flag_control_attitude_enabled) {
+			// generate the rate setpoint from sticks
+			manual_control_setpoint_s manual_control_setpoint;
+
+			if (_manual_control_setpoint_sub.update(&manual_control_setpoint)) {
+				// manual rates control - ACRO mode
+				const Vector3f man_rate_sp{
+					math::superexpo(manual_control_setpoint.roll, _param_mc_acro_expo.get(), _param_mc_acro_supexpo.get()),
+					math::superexpo(-manual_control_setpoint.pitch, _param_mc_acro_expo.get(), _param_mc_acro_supexpo.get()),
+					math::superexpo(manual_control_setpoint.yaw, _param_mc_acro_expo_y.get(), _param_mc_acro_supexpoy.get())};
+
+				_rates_setpoint = man_rate_sp.emult(_acro_rate_max);
+				_thrust_setpoint(2) = -(manual_control_setpoint.throttle + 1.f) * .5f;
+				_thrust_setpoint(0) = _thrust_setpoint(1) = 0.f;
+
+				// publish rate setpoint
+				vehicle_rates_setpoint.roll = _rates_setpoint(0);
+				vehicle_rates_setpoint.pitch = _rates_setpoint(1);
+				vehicle_rates_setpoint.yaw = _rates_setpoint(2);
+				_thrust_setpoint.copyTo(vehicle_rates_setpoint.thrust_body);
+				vehicle_rates_setpoint.timestamp = hrt_absolute_time();
+
+				_vehicle_rates_setpoint_pub.publish(vehicle_rates_setpoint);
+			}
+
+		} else if (_vehicle_rates_setpoint_sub.update(&vehicle_rates_setpoint)) {
+			if (_vehicle_rates_setpoint_sub.copy(&vehicle_rates_setpoint)) {
+				_rates_setpoint(0) = PX4_ISFINITE(vehicle_rates_setpoint.roll)  ? vehicle_rates_setpoint.roll  : rates(0);
+				_rates_setpoint(1) = PX4_ISFINITE(vehicle_rates_setpoint.pitch) ? vehicle_rates_setpoint.pitch : rates(1);
+				_rates_setpoint(2) = PX4_ISFINITE(vehicle_rates_setpoint.yaw)   ? vehicle_rates_setpoint.yaw   : rates(2);
+				_thrust_setpoint = Vector3f(vehicle_rates_setpoint.thrust_body);
+			}
+		}
+
+		// run the rate controller
+		if (_vehicle_control_mode.flag_control_rates_enabled) {
+
+			// =================================================================================
+			// 自定义角速度控制算法 (移植区域)
+			// =================================================================================
+			Vector3f torque_setpoint;
+
+			// float q_e0 = qe(0);
+			Vector3f q_ev(qe(1), qe(2), qe(3));
+			Vector3f z_3 = epsilon_q;
+
+			// 2. 参数定义
+			// 惯性张量 J_b (MATLAB: diag([0.16;0.16;0.32])),大致值即可
+			const Matrix3f J_b = diag(Vector3f(0.16f, 0.16f, 0.32f));
+			// 控制增益
+			const Matrix3f k_w = diag(Vector3f(20.f, 20.f, 20.f));
+			// 自适应参数
+			const Vector3f lambda_w_vec(8.f, 8.f, 8.f);
+			const Vector3f lambda_q_vec(8.f, 8.f, 8.f);
+			// const Matrix3f lambda_q_mat = diag(lambda_q_vec);
+
+			// 状态变量 (积分器)
+			static Vector3f alpha_q(0.f, 0.f, 0.f);
+			static Vector3f alpha_w(0.f, 0.f, 0.f);
+
+			// Reset integral if disarmed
+			if (!_vehicle_control_mode.flag_armed) {
+				alpha_q.setZero();
+				alpha_w.setZero();
+			}
+
+			// ============================
+			// 4. I&I 估计器更新
+			// ============================
+
+			// 当前机体角速度
+			Vector3f w_b_b = rates;
+
+			// --- Estimator 1: Attitude (d_qg part) ---
+			// d_qg = alpha_q + lambda_q * q_ev
+			Vector3f d_qg = alpha_q + lambda_q_vec.emult(q_ev);
+
+			// dalpha_q = -lambda_q * (Q_e * (w_b_b + d_qg))
+			Vector3f dalpha_q = -lambda_q_vec.emult(Q_e * (w_b_b + d_qg));
+
+			// 积分 alpha_q
+			if (PX4_ISFINITE(dalpha_q(0)) && !_landed) {
+				alpha_q += dalpha_q * dt;
+			}
+
+			// --- Estimator 2: Angular Velocity (d_wg part) ---
+			// z_4 = w_e - w_ec
+			// w_e 是当前角速度 w_b_b
+			// w_ec 是期望角速度，对应 _rates_setpoint
+			Vector3f w_e = w_b_b + d_qg;
+			Vector3f z_4 = w_e - _rates_setpoint;
+
+			// d_wg = alpha_w + lambda_w * J_b * z_4
+			Vector3f d_wg = alpha_w + lambda_w_vec.emult(J_b * z_4);
+
+			// 计算力矩 tau
+			// MATLAB: tau = -k_w*z_4 - Q_e.'*R_q.'*z_3 - d_wg;
+			Vector3f coupling_term = Q_e.transpose() * R_q.transpose() * z_3;
+			Vector3f tau = -k_w * z_4 - coupling_term - d_wg;
+
+			// dalpha_w = -lambda_w * (tau + d_wg)
+			Vector3f dalpha_w = -lambda_w_vec.emult(tau + d_wg);
+
+			// 积分 alpha_w
+			if (PX4_ISFINITE(dalpha_w(0)) && !_landed) {
+				alpha_w += dalpha_w * dt;
+			}
+
+			// 5. 输出赋值
+			// PX4 的 RateControl 输出通常是归一化的 torque (-1 to 1) 或者是物理力矩
+			// 如果 tau 是物理力矩 (Nm)，需要除以最大力矩或进行缩放
+			// 假设需要直接输出物理力矩，通过 mixer 处理，这里直接赋值
+			torque_setpoint = tau;
+			// apply low-pass filtering on yaw axis to reduce high frequency torque caused by rotor acceleration
+			torque_setpoint(2) = _output_lpf_yaw.update(torque_setpoint(2), dt);
+
+			// publish rate controller status
+			rate_ctrl_status_s rate_ctrl_status{};
+			// _rate_control.getRateControlStatus(rate_ctrl_status);
+			rate_ctrl_status.timestamp = hrt_absolute_time();
+			_controller_status_pub.publish(rate_ctrl_status);
+
+			// publish thrust and torque setpoints
+			vehicle_thrust_setpoint_s vehicle_thrust_setpoint{};
+			vehicle_torque_setpoint_s vehicle_torque_setpoint{};
+
+			_thrust_setpoint.copyTo(vehicle_thrust_setpoint.xyz);
+			vehicle_torque_setpoint.xyz[0] = PX4_ISFINITE(torque_setpoint(0)) ? torque_setpoint(0) : 0.f;
+			vehicle_torque_setpoint.xyz[1] = PX4_ISFINITE(torque_setpoint(1)) ? torque_setpoint(1) : 0.f;
+			vehicle_torque_setpoint.xyz[2] = PX4_ISFINITE(torque_setpoint(2)) ? torque_setpoint(2) : 0.f;
+
+			// scale setpoints by battery status if enabled
+			if (_param_mc_bat_scale_en.get()) {
+				if (_battery_status_sub.updated()) {
+					battery_status_s battery_status;
+
+					if (_battery_status_sub.copy(&battery_status) && battery_status.connected && battery_status.scale > 0.f) {
+						_battery_status_scale = battery_status.scale;
+					}
+				}
+
+				if (_battery_status_scale > 0.f) {
+					for (int i = 0; i < 3; i++) {
+						vehicle_thrust_setpoint.xyz[i] = math::constrain(vehicle_thrust_setpoint.xyz[i] * _battery_status_scale, -1.f, 1.f);
+						vehicle_torque_setpoint.xyz[i] = math::constrain(vehicle_torque_setpoint.xyz[i] * _battery_status_scale, -1.f, 1.f);
+					}
+				}
+			}
+
+			vehicle_thrust_setpoint.timestamp_sample = angular_velocity.timestamp_sample;
+			vehicle_thrust_setpoint.timestamp = hrt_absolute_time();
+			_vehicle_thrust_setpoint_pub.publish(vehicle_thrust_setpoint);
+
+			vehicle_torque_setpoint.timestamp_sample = angular_velocity.timestamp_sample;
+			vehicle_torque_setpoint.timestamp = hrt_absolute_time();
+			_vehicle_torque_setpoint_pub.publish(vehicle_torque_setpoint);
+
+			updateActuatorControlsStatus(vehicle_torque_setpoint, dt);
+		}
+
+		perf_end(_loop_perf);
+	}
 }
 
 int MulticopterAttitudeControlPPC::task_spawn(int argc, char *argv[])

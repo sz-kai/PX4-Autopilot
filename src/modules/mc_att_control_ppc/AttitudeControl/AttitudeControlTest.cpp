@@ -39,7 +39,7 @@ using namespace matrix;
 
 TEST(AttitudeControlTest, AllZeroCase)
 {
-	AttitudeControl attitude_control;
+	AttitudeControlPPC attitude_control;
 	Vector3f rate_setpoint = attitude_control.update(Quatf());
 	EXPECT_EQ(rate_setpoint, Vector3f());
 }
@@ -80,7 +80,7 @@ public:
 		EXPECT_GT(i, 0);
 	}
 
-	AttitudeControl _attitude_control;
+	AttitudeControlPPC _attitude_control;
 	Quatf _quat_state;
 	Quatf _quat_goal;
 };
@@ -115,7 +115,7 @@ TEST_F(AttitudeControlConvergenceTest, AttitudeControlConvergence)
 TEST(AttitudeControlTest, YawWeightScaling)
 {
 	// GIVEN: default tuning and pure yaw turn command
-	AttitudeControl attitude_control;
+	AttitudeControlPPC attitude_control;
 	const float yaw_gain = 2.8f;
 	const float yaw_sp = .1f;
 	Quatf pure_yaw_attitude(cosf(yaw_sp / 2.f), 0, 0, sinf(yaw_sp / 2.f));

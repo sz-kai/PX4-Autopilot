@@ -51,11 +51,11 @@
 #include <matrix/matrix/math.hpp>
 #include <mathlib/math/Limits.hpp>
 
-class AttitudeControl
+class AttitudeControlPPC
 {
 public:
-	AttitudeControl() = default;
-	~AttitudeControl() = default;
+	AttitudeControlPPC() = default;
+	~AttitudeControlPPC() = default;
 
 	/**
 	 * Set proportional attitude control gain
@@ -98,7 +98,8 @@ public:
 	 * @param q estimation of the current vehicle attitude unit quaternion
 	 * @return [rad/s] body frame 3D angular rate setpoint vector to be executed by the rate controller
 	 */
-	matrix::Vector3f update(const matrix::Quatf &q) const;
+	// matrix::Vector3f update(const matrix::Quatf &q) const;
+	matrix::Vector3f update(const matrix::Quatf &q, matrix::Quatf &qee, matrix::Vector3f &epsilon, matrix::Matrix3f &Q, matrix::Matrix3f &R_q) const;
 
 private:
 	matrix::Vector3f _proportional_gain;

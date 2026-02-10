@@ -43,7 +43,7 @@
 
 using namespace matrix;
 
-void AttitudeControl::setProportionalGain(const matrix::Vector3f &proportional_gain, const float yaw_weight)
+void AttitudeControlPPC::setProportionalGain(const matrix::Vector3f &proportional_gain, const float yaw_weight)
 {
 	_proportional_gain = proportional_gain;
 	_yaw_w = math::constrain(yaw_weight, 0.f, 1.f);
@@ -55,9 +55,9 @@ void AttitudeControl::setProportionalGain(const matrix::Vector3f &proportional_g
 }
 
 // 定义宏开关：1 使用您的自定义算法，0 使用PX4原生算法
-#define USE_CUSTOM_ATTITUDE_CONTROL 0
+#define USE_CUSTOM_ATTITUDE_CONTROL 1
 
-matrix::Vector3f AttitudeControl::update(const Quatf &q) const
+Vector3f AttitudeControlPPC::update(const matrix::Quatf &q, matrix::Quatf& qee, matrix::Vector3f& epsilon, matrix::Matrix3f& Q, matrix::Matrix3f& R_q) const
 {
 #if USE_CUSTOM_ATTITUDE_CONTROL
 	// =================================================================================
@@ -97,14 +97,14 @@ matrix::Vector3f AttitudeControl::update(const Quatf &q) const
 
 	// 控制增益
 	// MATLAB: k_Theta = diag([0.5;0.5;0.5]);
-	const Vector3f k_Theta_vec(5.0f, 5.0f, 5.0f);
+	const Vector3f k_Theta_vec(0.0005f, 0.0005f, 0.0005f);
 	// 直接使用 diag 将向量转为对角矩阵
 	Matrix3f k_Theta = diag(k_Theta_vec);
 	//k_Theta(0, 0) = k_Theta_vec(0); k_Theta(1, 1) = k_Theta_vec(1); k_Theta(2, 2) = k_Theta_vec(2);
 
 	// 自适应参数
 	// MATLAB: lambda_q = diag([8;8;8]);
-	const Vector3f lambda_q_vec(8.f, 8.f, 8.f);
+	const Vector3f lambda_q_vec(80.f, 80.f, 80.f);
 	// alpha_q 需要积分，使用静态变量保存状态
 	static Vector3f alpha_q(0.f, 0.f, 0.f);
 
@@ -154,6 +154,7 @@ matrix::Vector3f AttitudeControl::update(const Quatf &q) const
 	// quaternion attitude control law, qe is rotation from q to qd
 	// const Quatf qe = q.inversed() * qd;
 	const Quatf qe = qd.inversed() * q;
+	qee=qe;
 
 	float q_e0 = qe(0);
 	Vector3f q_ev(qe(1), qe(2), qe(3));
@@ -221,7 +222,7 @@ matrix::Vector3f AttitudeControl::update(const Quatf &q) const
 		// 构建 R_q 矩阵 (对角线元素)
 		R_q_mat(i, i) = r_q(i);
 	}
-
+	R_q = R_q_mat;
 	// 6. I&I 自适应律更新 (简化的)
 	// MATLAB: d_qg = alpha_q + lambda_q * q_ev;
 	// MATLAB: Q_e = 0.5*(q_e0*eye(3)+vx(q_ev));
@@ -241,6 +242,7 @@ matrix::Vector3f AttitudeControl::update(const Quatf &q) const
 
 	// Q_e = 0.5 * (q_e0 * I + hat(q_ev))
 	Matrix3f Q_e = (matrix::eye<float, 3>() * q_e0 + hat_q_ev) * 0.5f;
+	Q=Q_e;
 
 	// 尝试更新 alpha_q (由于缺少 w_b_b，这里暂时仅做示例，实际需传入 w_b_b)
 	// Vector3f w_b_b = _rates_prev; // 假设有一个变量存了角速度，或者此处设为0
@@ -262,6 +264,7 @@ matrix::Vector3f AttitudeControl::update(const Quatf &q) const
 	R_q_inv(2, 2) = 1.0f / R_q_mat(2, 2);
 
 	Vector3f z_3 = epsilon_q;
+	epsilon = epsilon_q;
 
 	// 计算控制项
 	Vector3f term = k_Theta * z_3 + n_q;
