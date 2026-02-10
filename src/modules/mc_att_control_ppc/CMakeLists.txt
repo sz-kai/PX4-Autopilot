@@ -42,7 +42,7 @@ px4_add_module(
 		mc_att_control_ppc_main.cpp
 		mc_att_control_ppc.hpp
 	DEPENDS
-		# AttitudeControlPPC
+		AttitudeControlPPC
 		mathlib
 		px4_work_queue
 		StickYaw
