@@ -13,13 +13,13 @@ control_allocator start
 #
 # Start Multicopter Rate Controller.
 #
-# mc_rate_control start
+mc_rate_control start
 
 #
 # Start Multicopter Attitude Controller.
 #
-# mc_att_control start
-mc_att_control_ppc start
+mc_att_control start
+# mc_att_control_ppc start
 
 if param greater -s MC_AT_EN 0
 then

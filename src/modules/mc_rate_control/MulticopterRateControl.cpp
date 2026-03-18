@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
+#pragma GCC optimize ("O0")
 
 #include "MulticopterRateControl.hpp"
 
@@ -181,7 +182,7 @@ MulticopterRateControl::Run()
 		_vehicle_status_sub.update(&_vehicle_status);
 
 		// use rates setpoint topic
-		vehicle_rates_setpoint_s vehicle_rates_setpoint{};
+	vehicle_rates_setpoint_s vehicle_rates_setpoint{};
 
 		if (_vehicle_control_mode.flag_control_manual_enabled && !_vehicle_control_mode.flag_control_attitude_enabled) {
 			// generate the rate setpoint from sticks

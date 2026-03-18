@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  ****************************************************************************/
+#pragma GCC optimize ("O0")
 
 /**
  * @file mc_att_control_main.cpp

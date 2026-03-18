@@ -31,6 +31,8 @@
  *
  ****************************************************************************/
 
+#pragma GCC optimize ("O0")
+
 /**
  * @file mc_att_control_main.cpp
  * Multicopter attitude controller.
@@ -339,8 +341,10 @@ MulticopterAttitudeControlPPC::Run()
 		_last_run = now;
 
 		vehicle_attitude_s v_att;
-		_vehicle_attitude_sub.update(&v_att);
-		const Quatf q{v_att.q};
+		// _vehicle_attitude_sub.update(&v_att);
+		// const Quatf q{v_att.q};
+		const Quatf q = _vehicle_attitude_sub.update(&v_att) ? Quatf{v_att.q} : Quatf{};
+
 
 		const Vector3f rates{angular_velocity.xyz};
 		const Vector3f angular_accel{angular_velocity.xyz_derivative};

@@ -70,6 +70,7 @@
             "label": "gazebo-classic build",
             "type": "shell",
             "command": "make px4_sitl_default sitl_gazebo-classic",
+            // "command": "make px4_sitl gazebo-classic",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -97,7 +98,8 @@
                     "PX4_SIM_SPEED_FACTOR": "1"
                 }
             },
-            "command": "gzserver --verbose ${workspaceFolder}/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/empty.world",
+            // "command": "gzserver --verbose ${workspaceFolder}/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/empty.world",
+            "command": "gazebo classic --verbose ${workspaceFolder}/Tools/simulation/gazebo-classic/sitl_gazebo-classic/worlds/empty.world",
             "isBackground": true,
             "presentation": {
                 "echo": true,
